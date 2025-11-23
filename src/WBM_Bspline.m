@@ -378,8 +378,23 @@ w = linsolve(K,f);
 %  ########################################################################
 
 % define mesh for plot
+switch config
+  case "init"
+    [xSol,ySol] = meshgrid(linspace(0,Lx,50),linspace(0,Ly,50));
+  case "Bspline"
+    etaLine = linspace(-1,1,50);
+    [Xi,Eta] = meshgrid(etaLine, etaLine);
+    xL = zeros(size(etaLine));
+    yL = (etaLine+1)/2;
+    [xR,yR,wGP_] = calcGPcoordinatesBspline(nodes{2},p,etaLine.',w);
+    xL = repmat(xL(:), 1, length(etaLine));
+    yL = repmat(yL(:), 1, length(etaLine));
+    xR = repmat(xR(:), 1, length(etaLine));
+    yR = repmat(yR(:), 1, length(etaLine));
+    xSol = (1 - Xi) / 2 .* xL + (Xi + 1) / 2 .* xR;
+    ySol = (1 - Xi) / 2 .* yL + (Xi + 1) / 2 .* yR;
+end
 
-[xSol,ySol] = meshgrid(linspace(0,Lx,50),linspace(0,Ly,50));
 p_total   = zeros(size(xSol));
 
 %  **********************************************
