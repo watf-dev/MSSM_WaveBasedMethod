@@ -1,9 +1,4 @@
 % Created: Nov, 10, 2025 16:10:44 by Wataru Fukuda
-%%% Note %%%
-% - pls switch the configuration between 'init' and 'Bspline' by commenting out either one
-% - I changed `nVecEdges = zeros(4,2)` to `nVecEdges = cell(4,1)` to store multiple normal vectors for the right edge(Bspline)
-
-
 %% ########################################################################
 %  #-------------------- STEP I - PREPARING PROGRAM ----------------------#
 %  ########################################################################
@@ -100,10 +95,6 @@ nWaveFunctionsSet1 = 2*n1+2;
 nWaveFunctionsSet2 = 2*n2+2;
 nWaveFunctions = nWaveFunctionsSet1+nWaveFunctionsSet2;
 
-%  ************************************
-%  ***  III.1 Evaluate Wave Numbers ***
-%  ************************************
-
 kxy1(nWaveFunctionsSet1,2) = 0;         %vector that stores the wave numbers
 
 for n=0:1:n1  % eq10
@@ -159,62 +150,13 @@ end
 
 K = zeros(nWaveFunctions,nWaveFunctions);
 
-%  ***********************************************************
-%  ***  IV.1 Loop to calculate entries of stiffness matrix ***
-%  ***********************************************************
-%        _    _  
-%    /\   |    |   dim1: Matrix Dimension equals to number of 
-%     dim1  | A ii(v)|     Element DOFs
-%    \/   |_    _| 
-%     
-%         <- dim1 ->  
-%
-% size(A ii): |2*(n1+n2)+4| x |2*(n1+n2)+4|
-
-
-%  *************************************
-%  ***  Loop over Shape Functions ii ***
-%  ************************************* 
-
 tic
 
 for ii = 1: nWaveFunctions
-  
-  % if ii <= 2*n1+2
-  if ii <= nWaveFunctionsSet1
-    set_ii = 1;
-  else 
-    set_ii = 2;
-  end
-  
-  %  *************************************
-  %  ***  Loop over Shape Functions jj ***
-  %  *************************************  
+  if ii <= nWaveFunctionsSet1, set_ii = 1; else , set_ii = 2; end
   
   for jj = 1: nWaveFunctions
-
-    % if jj <= 2*n1+2
-    if jj <= nWaveFunctionsSet1
-      set_jj = 1;
-    else 
-      set_jj = 2;
-    end
-      
-    %  *********************************
-    %  ***  IV.2 Loop over all edges ***
-    %  *********************************
-    %           ____4____
-    %           /      | 
-    %  		       1 /       |3
-    %         /      |
-    %        /_______2_____|		
-    %		       	
-    %  calculate stiffness contribution for each edge separately
-    %        
-    %        /           |
-    %    k=1  /    + k=2   + k=3 |   + ...
-    %      /             |
-    %       /   _______2_____    |
+    if jj <= nWaveFunctionsSet1, set_jj = 1; else, set_jj = 2; end
 
     for kk = 1:4
       
@@ -227,85 +169,37 @@ for ii = 1: nWaveFunctions
       switch cBC
 
         case 'v'
-          
-          % evaluate Shape Function 
-          % at the Gauß Point coordinates
           Psi_ii = evalShapeFunction(kxy(ii,1),kxy(ii,2),Lx,Ly,cXGP,cYGP,set_ii);
-               
-          % evaluate Shape Function Derivatives 
-          % as vector quantity
-          % at the Gauß Point coordinates          
           Psidot_jj_vec = evalShapeFunctionDerivative(kxy(jj,1),kxy(jj,2),Lx,Ly,cXGP,cYGP,set_jj);
-          % calculate normal derivative of sound velocity
-          % in outwards direction perpendicular to the edge
           Psidot_jj = sum(Psidot_jj_vec .* nVec', 1);
-                         
-          % carrying out the numerical integration
-          % here done in form of a vector scalar product
-          
           K(ii,jj)  = (1i/(density*omega) * cWGP.*Psi_ii)*Psidot_jj.' + K(ii,jj);  % todo: where does this equation come from?
               
         case 'p'
-          
-          % evaluate Shape Function Derivatives 
-          % as vector quantity
-          % at the Gauß Point coordinates          
           Psidot_ii_vec = evalShapeFunctionDerivative(kxy(ii,1),kxy(ii,2),Lx,Ly,cXGP,cYGP,set_ii);
-          % calculate normal derivative of sound velocity
-          % in outwards direction perpendicular to the edge
-          Psidot_ii =  Psidot_ii_vec(1,:) .* n1p + Psidot_ii_vec(2,:) .* n2p;
-               
-          % evaluate Shape Function 
-          % at the Gauß Point coordinates                         
+          Psidot_ii = sum(Psidot_ii_vec .* nVec', 1);
           Psi_jj = evalShapeFunction(kxy(jj,1),kxy(jj,2),Lx,Ly,cXGP,cYGP,set_jj);
-                         
-          % carrying out the numerical integration
-          % here done in form of a vector scalar product
-          
           K(ii,jj) = (-1i/(density*omega)* cWGP.*Psidot_ii)*Psi_jj.' + K(ii,jj);  % todo: where does this equation come from?
               
         case 'z'
           K(ii,jj) = 0;
-      
           
       end
-
     end
-
   end
-  
 end
 
 toc
-
-% Optional - Matrix Calculation instead of Loop
-% Uncoment block to use
 
 
 %% ########################################################################
 %  #------------------ STEP V - CALCULATE LOAD VECTOR --------------------#
 %  ########################################################################
-
 f = zeros(nWaveFunctions,1);
 
-%  *****************************************************
-%  ***  V.1 Loop to calculate entries of load vector ***
-%  *****************************************************
-
 for ii = 1:nWaveFunctions
-  
-  % if ii <= 2*n1+2
-  if ii <= nWaveFunctionsSet1
-    set_ii = 1;
-  else 
-    set_ii = 2;
-  end  
+  if ii <= nWaveFunctionsSet1, set_ii = 1; else, set_ii = 2;end  
     
-%  ********************************
-%  ***  V.2 Loop over all edges ***
-%  ********************************
   for kk = 1:4
-    
     cBC  = BCs(kk);
     cWGP = wGP(kk,:);
     cXGP = xGP(kk,:);
@@ -315,46 +209,21 @@ for ii = 1:nWaveFunctions
     switch cBC
 
       case 'v'
-        
-        % evaluate Shape Function 
-        % at the Gauß Point coordinates
-        Psi_ii = evalShapeFunction(kxy(ii,1),kxy(ii,2),...
-               Lx,Ly,...
-               cXGP,cYGP,set_ii);
-             
-        % evaluate load function derivative at Gauß Points     
+        Psi_ii = evalShapeFunction(kxy(ii,1),kxy(ii,2),Lx,Ly,cXGP,cYGP,set_ii);
         v_q_vec  = evalLoadFunctionDerivative(q0,xQ,yQ,density,omega,kWave,cXGP,cYGP);   
-        % calculate normal derivative of sound velocity
-        % in outwards direction perpendicular to the edge
-        v_q =  v_q_vec(1,:) * nVec(1) + ...
-             v_q_vec(2,:) * nVec(2); 
-             
+        v_q =  v_q_vec(1,:) * nVec(1) + v_q_vec(2,:) * nVec(2); 
         f(ii) = - (cWGP.*Psi_ii)*v_q.' + f(ii);  % todo: where does this equation come from?
+
       case 'p'
-        
-        % evaluate Shape Function Derivatives 
-        % as vector quantity
-        % at the Gauß Point coordinates          
-        Psidot_ii_vec = evalShapeFunctionDerivative...
-                        (kxy(ii,1),kxy(ii,2),...
-                         Lx,Ly,...
-                         cXGP,cYGP,set_ii);  
-        % calculate normal derivative of sound velocity
-        % in outwards direction perpendicular to the edge
-        Psidot_ii =  Psidot_ii_vec(1,:) * nVec(1) + ...
-               Psidot_ii_vec(2,:) * nVec(2);  
-        % evaluate load function at Gauß Points     
+        Psidot_ii_vec = evalShapeFunctionDerivative(kxy(ii,1),kxy(ii,2),Lx,Ly,cXGP,cYGP,set_ii);
+        Psidot_ii =  Psidot_ii_vec(1,:) * nVec(1) + Psidot_ii_vec(2,:) * nVec(2);
         p_q   = evalLoadFunction(q0,xQ,yQ,density,omega,kWave,cXGP,cYGP);
-        
-        % carrying out the numerical integration
-        % here done in form of a vector scalar product          
-        f(ii) = (1i/(density*omega)* ...
-                 cWGP.*Psidot_ii)*p_q.' + f(ii);  % todo: where does this equation come from?
+        f(ii) = (1i/(density*omega)*cWGP.*Psidot_ii)*p_q.' + f(ii);  % todo: where does this equation come from?
+
       case 'z'
       f(ii) = 0;
         
     end 
-    
   end
 end
 
@@ -368,7 +237,6 @@ w = linsolve(K,f);
 %  #---------------- STEP VII - RESUME AND PLOT RESULTS -----------------#
 %  ########################################################################
 
-% define mesh for plot
 switch config
   case "init"
     [xSol,ySol] = meshgrid(linspace(0,Lx,50),linspace(0,Ly,50));
@@ -388,59 +256,19 @@ end
 
 p_total   = zeros(size(xSol));
 
-%  **********************************************
-%  ***  VII.1 Resume Homogenous solution part ***
-%  **********************************************
-
 % Homogenous solution
 for ii = 1:nWaveFunctions
+  if ii <= nWaveFunctionsSet1, set_ii = 1; else , set_ii = 2; end
   
-  % if ii <= 2*n1+2
-  if ii <= nWaveFunctionsSet1
-    set_ii = 1;
-  else 
-    set_ii = 2;
-  end 
-  
-  Psi_ii  = evalShapeFunction(kxy(ii,1),kxy(ii,2),...
-        Lx,Ly,...
-        xSol,ySol,set_ii); 
-      
+  Psi_ii  = evalShapeFunction(kxy(ii,1),kxy(ii,2),Lx,Ly,xSol,ySol,set_ii); 
   p_total = Psi_ii * w(ii) + p_total;
-
 end
-
-%  *******************************************
-%  ***  VII.2 Add Particular solution part ***
-%  *******************************************
 
 % Particular solution
 p_part  = evalLoadFunction(q0,xQ,yQ,density,omega,kWave,xSol,ySol);
 p_total = p_part + p_total;
 
-%  ********************************
-%  ***  VII.3 Visualize results ***
-%  ********************************
-
-% plot real part of total solution
-% figure('Name','Real Part of Total Solution','NumberTitle','off');
-% surf(xSol,ySol,real(p_total))
-%
-% % plot imaginary part of total solution
-% figure('Name','Imaginary Part of Total Solution','NumberTitle','off');
-% surf(xSol,ySol,imag(p_total))
-%
-% % plot a single shape function
-% figure('Name','Single Shape Function','NumberTitle','off');
-% ax1 = subplot(2,1,1);
-% surf(xSol,ySol,real(evalShapeFunction(kxy(3,1),kxy(3,2),...
-%         Lx,Ly,...
-%         xSol,ySol,1)))
-% ax1 = subplot(2,1,2);
-% surf(xSol,ySol,imag(evalShapeFunction(kxy(3,1),kxy(3,2),...
-%         Lx,Ly,...
-%         xSol,ySol,1)))      
-
+% visualization
 figure;
 contourf(xSol, ySol, abs(p_total), 100, 'LineStyle', 'none');
 title('Acoustic Pressure Amplitude |p|');
@@ -449,13 +277,11 @@ xlabel('x'); ylabel('y');colorbar;
 figure('Name','Total Solution Visualization','NumberTitle','off','Position',[100 100 1200 800]);
 subplot(2,2,1);
 surf(xSol, ySol, real(p_total)); 
-% contourf(xSol, ySol, real(p_total), 40, 'LineStyle', 'none');
 title('Real Part of Total Solution');
 xlabel('x'); ylabel('y'); shading interp; colorbar;
 
 subplot(2,2,2);
 surf(xSol, ySol, imag(p_total)); 
-% contourf(xSol, ySol, imag(p_total), 40, 'LineStyle', 'none');
 title('Imaginary Part of Total Solution');
 xlabel('x'); ylabel('y'); 
 shading interp; colorbar;
@@ -475,10 +301,8 @@ sgtitle('Total Solution and Single Shape Function');
 %% === Extra Plot ===
 figure('Name','High Contrast Amplitude','NumberTitle','off');
 contourf(xSol, ySol, abs(p_total), 40, 'LineStyle', 'none');
-
 colormap(jet);      
 colorbar;
-
 caxis([min(abs(p_total(:)))  max(abs(p_total(:)))]);
 title('|p| High-Contrast (Max=Red)');
 axis equal tight;
