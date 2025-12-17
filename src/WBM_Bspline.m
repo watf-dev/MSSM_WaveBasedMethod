@@ -1,4 +1,9 @@
 % Created: Nov, 10, 2025 16:10:44 by Wataru Fukuda
+%%% Note %%%
+% - pls switch the configuration between 'init' and 'Bspline' by commenting out either one
+% - I changed `nVecEdges = zeros(4,2)` to `nVecEdges = cell(4,1)` to store multiple normal vectors for the right edge(Bspline)
+
+
 %% ########################################################################
 %  #-------------------- STEP I - PREPARING PROGRAM ----------------------#
 %  ########################################################################
@@ -64,10 +69,10 @@ switch config
     Lx = 1.25;  % todo
     Ly = 1;
 
-    n1 = 5;  % todo
-    n2 = 5;
+    n1 = 10;  % todo
+    n2 = 10;
 
-    nGP = 15;  % todo
+    nGP = 50;  % todo
 
     q0 = 1;
     xQ = 0.25;
@@ -135,7 +140,7 @@ nVecEdges = cell(4,1);
 
 for ii = 1:4
   [xhi, w] = getGP(nGP);
-  if size(nodes{ii}) == 2
+  if size(nodes{ii}) == 2  % straight edges
     startPoint = nodes{ii}(1,:);
     endPoint = nodes{ii}(2,:);
     [xGP_,yGP_,wGP_] = calcGPcoordinates(startPoint,endPoint,xhi,w);
@@ -217,61 +222,55 @@ for ii = 1: nWaveFunctions
       cWGP = wGP(kk,:);
       cXGP = xGP(kk,:);
       cYGP = yGP(kk,:);
-      nVec = nVecEdges{kk};
+      % nVec = nVecEdges{kk};
       
+      if size(nodes{kk}) == 2  % straight edges
+        n1p = nVecEdges{kk}(:,1)*ones(1,nGP);
+        n2p = nVecEdges{kk}(:,2)*ones(1,nGP);
+      else
+        n1p = nVecEdges{kk}(:,1).';
+        n2p = nVecEdges{kk}(:,2).';
+      end
+
       switch cBC
 
         case 'v'
           
           % evaluate Shape Function 
           % at the Gauﬂ Point coordinates
-          Psi_ii = evalShapeFunction(kxy(ii,1),kxy(ii,2),...
-                 Lx,Ly,...
-                 cXGP,cYGP,set_ii);
+          Psi_ii = evalShapeFunction(kxy(ii,1),kxy(ii,2),Lx,Ly,cXGP,cYGP,set_ii);
                
           % evaluate Shape Function Derivatives 
           % as vector quantity
           % at the Gauﬂ Point coordinates          
-          Psidot_jj_vec = evalShapeFunctionDerivative...
-                (kxy(jj,1),kxy(jj,2),...
-                 Lx,Ly,...
-                 cXGP,cYGP,set_jj);
+          Psidot_jj_vec = evalShapeFunctionDerivative(kxy(jj,1),kxy(jj,2),Lx,Ly,cXGP,cYGP,set_jj);
           % calculate normal derivative of sound velocity
           % in outwards direction perpendicular to the edge
-          Psidot_jj =  Psidot_jj_vec(1,:) * nVec(1) + ...
-                 Psidot_jj_vec(2,:) * nVec(2);
+          Psidot_jj =  Psidot_jj_vec(1,:) .* n1p + Psidot_jj_vec(2,:) .* n2p;
                          
           % carrying out the numerical integration
           % here done in form of a vector scalar product
           
-          K(ii,jj)  = (1i/(density*omega)* ...
-                  cWGP.*Psi_ii)*Psidot_jj.' + K(ii,jj);  % todo: where does this equation come from?
+          K(ii,jj)  = (1i/(density*omega) * cWGP.*Psi_ii)*Psidot_jj.' + K(ii,jj);  % todo: where does this equation come from?
               
         case 'p'
           
           % evaluate Shape Function Derivatives 
           % as vector quantity
           % at the Gauﬂ Point coordinates          
-          Psidot_ii_vec = evalShapeFunctionDerivative...
-                          (kxy(ii,1),kxy(ii,2),...
-                           Lx,Ly,...
-                           cXGP,cYGP,set_ii);  
+          Psidot_ii_vec = evalShapeFunctionDerivative(kxy(ii,1),kxy(ii,2),Lx,Ly,cXGP,cYGP,set_ii);
           % calculate normal derivative of sound velocity
           % in outwards direction perpendicular to the edge
-          Psidot_ii =  Psidot_ii_vec(1,:) * nVec(1) + ...
-                 Psidot_ii_vec(2,:) * nVec(2);
+          Psidot_ii =  Psidot_ii_vec(1,:) .* n1p + Psidot_ii_vec(2,:) .* n2p;
                
           % evaluate Shape Function 
           % at the Gauﬂ Point coordinates                         
-          Psi_jj = evalShapeFunction(kxy(jj,1),kxy(jj,2),...
-                           Lx,Ly,...
-                           cXGP,cYGP,set_jj);
+          Psi_jj = evalShapeFunction(kxy(jj,1),kxy(jj,2),Lx,Ly,cXGP,cYGP,set_jj);
                          
           % carrying out the numerical integration
           % here done in form of a vector scalar product
           
-          K(ii,jj) = (-1i/(density*omega)* ...
-                  cWGP.*Psidot_ii)*Psi_jj.' + K(ii,jj);  % todo: where does this equation come from?
+          K(ii,jj) = (-1i/(density*omega)* cWGP.*Psidot_ii)*Psi_jj.' + K(ii,jj);  % todo: where does this equation come from?
               
         case 'z'
           K(ii,jj) = 0;
@@ -450,15 +449,24 @@ p_total = p_part + p_total;
 %         Lx,Ly,...
 %         xSol,ySol,1)))      
 
-figure('Name','Total Solution Visualization','NumberTitle','off','Position',[100 100 1200 800]);
+figure;
+contourf(xSol, ySol, abs(p_total), 100, 'LineStyle', 'none');
+title('Acoustic Pressure Amplitude |p|');
+xlabel('x'); ylabel('y');colorbar;
 
+figure('Name','Total Solution Visualization','NumberTitle','off','Position',[100 100 1200 800]);
 subplot(2,2,1);
-surf(xSol, ySol, real(p_total)); title('Real Part of Total Solution');
+surf(xSol, ySol, real(p_total)); 
+% contourf(xSol, ySol, real(p_total), 40, 'LineStyle', 'none');
+title('Real Part of Total Solution');
 xlabel('x'); ylabel('y'); shading interp; colorbar;
 
 subplot(2,2,2);
-surf(xSol, ySol, imag(p_total)); title('Imaginary Part of Total Solution');
-xlabel('x'); ylabel('y'); shading interp; colorbar;
+surf(xSol, ySol, imag(p_total)); 
+% contourf(xSol, ySol, imag(p_total), 40, 'LineStyle', 'none');
+title('Imaginary Part of Total Solution');
+xlabel('x'); ylabel('y'); 
+shading interp; colorbar;
 
 subplot(2,2,3);
 surf(xSol, ySol, real(evalShapeFunction(kxy(3,1),kxy(3,2), Lx, Ly, xSol, ySol, 1)));
@@ -471,6 +479,17 @@ title('Imaginary Part of Shape Function');
 xlabel('x'); ylabel('y'); shading interp; colorbar;
 
 sgtitle('Total Solution and Single Shape Function');
+
+%% === Extra Plot ===
+figure('Name','High Contrast Amplitude','NumberTitle','off');
+contourf(xSol, ySol, abs(p_total), 40, 'LineStyle', 'none');
+
+colormap(jet);      
+colorbar;
+
+caxis([min(abs(p_total(:)))  max(abs(p_total(:)))]);
+title('|p| High-Contrast (Max=Red)');
+axis equal tight;
 
 %%% keep figures %%%
 uiwait(gcf);
@@ -747,13 +766,13 @@ function [xGP_,yGP_,wGP_] = calcGPcoordinatesBspline(cps,p,xhi,w)
   end
   xGP_ = coord(:,1);
   yGP_ = coord(:,2);
-  jacobiDet = 1;  % todo
+  jacobiDet = (max(kv) - min(kv)) / 2;  % todo
   wGP_ = w * jacobiDet;
 end
 
 function nVec = calcNormalVectors(startPoint, endPoint)
   tVecEdges = zeros(1,2);
-  tVecEdges = [endPoint(1)-startPoint(1) endPoint(2)-startPoint(2)];  % y-coordinate
+  tVecEdges = [endPoint(1)-startPoint(1) endPoint(2)-startPoint(2)];
   cLtVec      = abs(sqrt(tVecEdges(1)^2+tVecEdges(2)^2));
   nVec = [tVecEdges(2)/cLtVec,-tVecEdges(1)/cLtVec];
 end
@@ -772,6 +791,7 @@ function nVecBspline = calcNormalVectorsBspline(cps, p, xhi, w)
     end
     tVec = N * cps;
     cLtVec = abs(sqrt(tVec(1)^2+tVec(2)^2));
+    % nVec = - [tVec(2)/cLtVec,-tVec(1)/cLtVec];  % todo
     nVec = [tVec(2)/cLtVec,-tVec(1)/cLtVec];
     nVecBspline(j,:) = nVec;
   end
@@ -822,5 +842,5 @@ end
 
 function kv = makeKnotVector(p,nn,ne);
   kv = [zeros(1,p+1), 1:(ne-1), ne*ones(1,p+1)];
-  % kv = kv/max(kv); % normalization, not necessary
+  kv = kv/max(kv);
 end
