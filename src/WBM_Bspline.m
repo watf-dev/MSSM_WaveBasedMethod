@@ -222,16 +222,8 @@ for ii = 1: nWaveFunctions
       cWGP = wGP(kk,:);
       cXGP = xGP(kk,:);
       cYGP = yGP(kk,:);
-      % nVec = nVecEdges{kk};
+      nVec = nVecEdges{kk};
       
-      if size(nodes{kk}) == 2  % straight edges
-        n1p = nVecEdges{kk}(:,1)*ones(1,nGP);
-        n2p = nVecEdges{kk}(:,2)*ones(1,nGP);
-      else
-        n1p = nVecEdges{kk}(:,1).';
-        n2p = nVecEdges{kk}(:,2).';
-      end
-
       switch cBC
 
         case 'v'
@@ -246,7 +238,7 @@ for ii = 1: nWaveFunctions
           Psidot_jj_vec = evalShapeFunctionDerivative(kxy(jj,1),kxy(jj,2),Lx,Ly,cXGP,cYGP,set_jj);
           % calculate normal derivative of sound velocity
           % in outwards direction perpendicular to the edge
-          Psidot_jj =  Psidot_jj_vec(1,:) .* n1p + Psidot_jj_vec(2,:) .* n2p;
+          Psidot_jj = sum(Psidot_jj_vec .* nVec', 1);
                          
           % carrying out the numerical integration
           % here done in form of a vector scalar product
