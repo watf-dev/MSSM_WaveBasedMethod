@@ -2,13 +2,16 @@
 %% ########################################################################
 %  #-------------------- STEP I - PREPARING PROGRAM ----------------------#
 %  ########################################################################
-
 clear classes; clear all; clc
-
 
 %% ########################################################################
 %  #-------------------- STEP II - DEFINE INPUT DATA ---------------------#
 %  ########################################################################
+n_input = str2double(getenv('N_INPUT'));
+if isnan(n_input)
+  n_input = 50; % default
+end
+fprintf('n_input = %d\n', n_input);
 
 % config = 'init';
 config = 'Bspline';
@@ -61,13 +64,13 @@ switch config
             } ;
     p = 3;
 
-    Lx = 1.25;  % todo
+    Lx = 1.25;
     Ly = 1;
 
-    n1 = 10;  % todo
-    n2 = 10;
+    n1 = n_input;  % todo
+    n2 = n_input;
 
-    nGP = 50;  % todo
+    nGP = 3000;  % todo
 
     q0 = 1;
     xQ = 0.25;
@@ -83,13 +86,23 @@ switch config
     frequency    = 800;               % frequency in Hz
     omega        = frequency*2*pi;   % circular frequency
 
+    eval_nodes = [0.1 ,  0.1 ;
+                  0.5 ,  0.1 ;
+                  0.8 ,  0.1 ;
+                  0.1 ,  0.5 ;
+                  0.5 ,  0.5 ;
+                  0.8 ,  0.5 ;
+                  1.0 ,  0.5 ;
+                  0.1 ,  0.8 ;
+                  0.5 ,  0.8 ;
+                  0.8 ,  0.8 ];
+
 end
 
 
 %% ########################################################################
 %  #-------------------- STEP III - SHAPE FUNCTIONS ----------------------#
 %  ########################################################################
-
 kWave = omega/waveVelocity;
 nWaveFunctionsSet1 = 2*n1+2;
 nWaveFunctionsSet2 = 2*n2+2;
@@ -123,14 +136,14 @@ kxy = [kxy1;kxy2];
 %% ########################################################################
 %  #--------------- STEP IV - CALCULATE STIFFNESS MATRIX -----------------#
 %  ########################################################################
-
 xGP = zeros(4,nGP);
 yGP = zeros(4,nGP);
 wGP = zeros(4,nGP);
 nVecEdges = cell(4,1);
 
 for ii = 1:4
-  [xhi, w] = getGP(nGP);
+  % [xhi, w] = getGP(nGP);
+  [xhi, w] = GaussQuad(nGP);
   if size(nodes{ii}) == 2  % straight edges
     startPoint = nodes{ii}(1,:);
     endPoint = nodes{ii}(2,:);
@@ -150,7 +163,7 @@ end
 
 K = zeros(nWaveFunctions,nWaveFunctions);
 
-tic
+t = tic;
 
 for ii = 1: nWaveFunctions
   if ii <= nWaveFunctionsSet1, set_ii = 1; else , set_ii = 2; end
@@ -188,8 +201,11 @@ for ii = 1: nWaveFunctions
   end
 end
 
-toc
-
+elapsed_time = toc(t);
+filename = sprintf('elapsed_time_nGP%d.txt', nGP);
+fid = fopen(filename,'a');
+fprintf(fid, '%d %.16e\n', nWaveFunctions, elapsed_time);
+fclose(fid);
 
 %% ########################################################################
 %  #------------------ STEP V - CALCULATE LOAD VECTOR --------------------#
@@ -230,13 +246,11 @@ end
 %% ########################################################################
 %  #---------------- STEP VI - SOLVE SYSTEM OF EQUATIONS -----------------#
 %  ########################################################################
-
 w = linsolve(K,f);
 
 %% ########################################################################
 %  #---------------- STEP VII - RESUME AND PLOT RESULTS -----------------#
 %  ########################################################################
-
 switch config
   case "init"
     [xSol,ySol] = meshgrid(linspace(0,Lx,50),linspace(0,Ly,50));
@@ -269,11 +283,6 @@ p_part  = evalLoadFunction(q0,xQ,yQ,density,omega,kWave,xSol,ySol);
 p_total = p_part + p_total;
 
 % visualization
-figure;
-contourf(xSol, ySol, abs(p_total), 100, 'LineStyle', 'none');
-title('Acoustic Pressure Amplitude |p|');
-xlabel('x'); ylabel('y');colorbar;
-
 figure('Name','Total Solution Visualization','NumberTitle','off','Position',[100 100 1200 800]);
 subplot(2,2,1);
 surf(xSol, ySol, real(p_total)); 
@@ -296,19 +305,67 @@ surf(xSol, ySol, imag(evalShapeFunction(kxy(3,1),kxy(3,2), Lx, Ly, xSol, ySol, 1
 title('Imaginary Part of Shape Function');
 xlabel('x'); ylabel('y'); shading interp; colorbar;
 
-sgtitle('Total Solution and Single Shape Function');
+sgtitle(sprintf('Total Solution and Single Shape Function with nGP: %d, nWaveFunctions: %d', nGP, nWaveFunctions));
 
 %% === Extra Plot ===
 figure('Name','High Contrast Amplitude','NumberTitle','off');
-contourf(xSol, ySol, abs(p_total), 40, 'LineStyle', 'none');
+contourf(xSol, ySol, abs(p_total), 60, 'LineStyle', 'none');
+hold on;
+plot(eval_nodes(:,1), eval_nodes(:,2),'ko', 'MarkerFaceColor','w', 'MarkerSize',7);
+dx_ = +0.02;
+dy_ = -0.02;
+for i = 1:size(eval_nodes,1)
+  text(eval_nodes(i,1) + dx_, ...
+   eval_nodes(i,2) + dy_, ...
+   sprintf('point %d', i), ...
+   'FontSize', 11, ...
+   'Color', 'k', ...
+   'HorizontalAlignment','right', ...
+   'VerticalAlignment','top');
+end
 colormap(jet);      
 colorbar;
 caxis([min(abs(p_total(:)))  max(abs(p_total(:)))]);
-title('|p| High-Contrast (Max=Red)');
+title(sprintf('|p| with nGP: %d, nWaveFunctions: %d', nGP, nWaveFunctions));
 axis equal tight;
 
 %%% keep figures %%%
-uiwait(gcf);
+% uiwait(gcf);
+
+%% figures export %%
+figFolder = 'FIGS';
+if ~exist(figFolder, 'dir')
+  mkdir(figFolder);
+end
+
+fileBase = sprintf('%s/fig_nGP%d_n%d', figFolder, nGP, nWaveFunctions);
+
+figure(1);
+exportgraphics(gcf, [fileBase '.png'], 'Resolution',300); 
+
+figure(2);
+exportgraphics(gcf, [fileBase '_amplitude.png'], 'Resolution',300);
+
+%% data output %%
+evalFolder = sprintf('EVAL_NODE_nGP%d', nGP);
+if ~exist(evalFolder, 'dir')
+  mkdir(evalFolder);
+end
+eval_result = 0;
+for j = 1:size(eval_nodes,1)
+  xq = eval_nodes(j,1);
+  yq = eval_nodes(j,2);
+  for ii = 1:nWaveFunctions
+    if ii <= nWaveFunctionsSet1, set_ii = 1; else, set_ii = 2; end
+    Psi_ii = evalShapeFunction(kxy(ii,1), kxy(ii,2), Lx, Ly, xq, yq, set_ii);
+    eval_result = eval_result + Psi_ii * w(ii);
+  end
+  filename = sprintf('%s/eval_node%d.txt', evalFolder, j);
+  fid = fopen(filename, 'a');
+  fprintf(fid, '%d %.16e\n', nWaveFunctions, eval_result);
+  fclose(fid);
+end
+
 
 % #########################################################################
 %             
@@ -660,3 +717,12 @@ function kv = makeKnotVector(p,nn,ne);
   kv = [zeros(1,p+1), 1:(ne-1), ne*ones(1,p+1)];
   kv = kv/max(kv);
 end
+
+function [xi, w] = GaussQuad(n)
+  beta = 0.5 ./ sqrt(1-(2*(1:n-1)).^-2);
+  T = diag(beta,1) + diag(beta,-1);
+  [V,D] = eig(T);
+  xi = diag(D);
+  w = 2 * V(1,:).^2;
+end
+
