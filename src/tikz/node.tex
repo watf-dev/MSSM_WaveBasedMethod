@@ -1,0 +1,65 @@
+% Created: Dec, 18, 2025 08:44:10 by Wataru Fukuda
+\documentclass[multi=minipage,border=0]{standalone}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{pgfplots,tikz}
+\usepackage{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[scaled]{helvet}
+\usepackage{pgffor}
+\renewcommand*\familydefault{\sfdefault}
+
+\providecommand{\datanum}{0}
+\providecommand{\ymin}{0}
+\providecommand{\ymax}{0}
+
+\pgfplotsset{compat=newest}
+\pgfplotsset{every axis/.append style={
+  thick,
+  solid,
+  grid=major,
+  % axis equal image,
+  scale only axis=true,
+  %=== x setting ===%
+  xmin=0, xmax=1500,
+  xtick={0,250,...,1500},
+  xlabel={\textrm{nWaveFunctions}},
+  %=== y setting ===%
+  ymin=\ymin, ymax=\ymax,
+  % ytick={400,410,...,500},
+  ylabel={$|p|$},
+  %=== legend setting ===%
+  legend columns=3,
+  legend style={
+    at={(0.5,-0.15)},
+    anchor=north,
+    font=\normalsize,
+    legend columns=-1,
+    legend cell align=left,
+    /tikz/every even column/.append style={column sep=0.5cm},
+    draw=none,
+  },
+  %=== cycle list ===%
+  cycle list name=color list,
+  cycle list={
+    {mark=*, color=red},
+    {mark=*, color=blue},
+    % {mark=*, color=orange},
+    {mark=*, color=green},
+    {mark=*, color=pink},
+    {mark=*, color=yellow},
+    {mark=*, color=purple},
+  },
+}}
+
+\begin{document}
+\begin{tikzpicture}
+\begin{axis}[title={\textrm{Evaluation Point \datanum\;— Pressure magnitude}}]
+  \addplot table [x index=0, y index=1] {EVAL_NODE_nGP500/eval_node\datanum.txt};
+  \addlegendentry{\textrm{nGP: 500}};
+  \addplot table [x index=0, y index=1] {EVAL_NODE_nGP1000/eval_node\datanum.txt};
+  \addlegendentry{\textrm{nGP: 1000}};
+  \addplot table [x index=0, y index=1] {EVAL_NODE_nGP3000/eval_node\datanum.txt};
+  \addlegendentry{\textrm{nGP: 3000}};
+\end{axis}
+\end{tikzpicture}
+\end{document}
