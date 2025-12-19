@@ -2,7 +2,10 @@
 # Created: Dec, 18, 2025 09:53:16 by Wataru Fukuda
 set -eu
 
-mkdir -p figs
+BASE=$(readlink -f $(dirname $0))
+OUTPUT=tikzfigs
+
+mkdir -p $OUTPUT
 
 for i in {1..9}; do
   data=EVAL_NODE_nGP500/eval_node${i}.txt
@@ -15,8 +18,11 @@ for i in {1..9}; do
 
   echo node $i: ymin=$ymin ymax=$ymax
 
-  lualatex -interaction=batchmode -shell-escape "\def\datanum{$i} \def\ymin{$ymin} \def\ymax{$ymax} \input{node.tex}"
-  pdfcrop node.pdf figs/node${i}.pdf --margin 5
+  lualatex -interaction=batchmode -shell-escape "\def\datanum{$i} \def\ymin{$ymin} \def\ymax{$ymax} \input{$BASE/node.tex}"
+  pdfcrop node.pdf $OUTPUT/node${i}.pdf --margin 5
 done
+
+lualatex $BASE/elapsed_time.tex
+pdfcrop elapsed_time.pdf $OUTPUT/elapsed_time.pdf --margin 5
 
 rm *.aux *.log *.pdf
